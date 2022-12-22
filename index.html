@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+		<title>Demo Konfiguraator</title>
+		
+		<meta name="viewport" content="width=device-width, user-scalable=yes, minimum-scale=1.0, maximum-scale=1.0">
+		<link type="text/css" rel="stylesheet" href="./main.css">
+
+	<body>
+		<script async src="https://unpkg.com/es-module-shims@1.3.6/dist/es-module-shims.js"></script>
+		<script type="importmap">
+			{
+				"imports": {
+					"three": "https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.module.js",
+					"three/": "https://cdn.jsdelivr.net/npm/three@0.147.0/"
+				}
+			}
+		</script>
+
+		<script type="module">
+
+			import * as THREE from  'three'
+			import   {STLLoader}  from "three/examples/jsm/loaders/STLLoader.js"
+			import   {TrackballControls}   from "three/examples/jsm/controls/TrackballControls.js"
+
+			let container, controls;
+			let camera, scene, renderer, raycaster;
+			let guiData;
+
+			let INTERSECTED = null;
+			let INTERSECTED2 = null;
+
+			const pointer = new THREE.Vector2();
+			var moduleSets = [];
+			var doorSelected
+			var doorColors = [0xe1e0de, 0xf4db14, 0x005ea0]
+			var doors = [];
+			var doorSamples = [];	
+			
+			init();
+			animate();
+
+			function init() {
+
+				container = document.createElement( 'div' );
+				document.body.appendChild( container );
+
+				camera = new THREE.PerspectiveCamera( 50, window.innerWidth / window.innerHeight, 1000, 40000 );
+				camera.position.set(0, 1000, 10000)
+				document.getElementById("button1").addEventListener("click", frontView, false);
+				function frontView() {
+					camera.position.set(0, 1000, 10000)
+					camera.rotation.set(0, 0, 0)
+					camera.up.set(0, 0, 0)
+					controls.reset();
+				}
+
+				scene = new THREE.Scene();
+				scene.background = new THREE.Color( 0xdeebed );
+				scene.add( new THREE.HemisphereLight() );
+				scene.fog = new THREE.Fog( 0x72645b, 10000, 50000 );
+				scene.selectableModule = [];
+
+				//pikkuse valikud
+				var lengthInput = document.getElementById("locker_length");
+				var lengthOutput = document.getElementById("locker_length_out");
+				var lockerLength = 0
+				lengthOutput.innerHTML = lengthInput.value; 
+				lengthInput.oninput = function() {
+					countDoors();
+					lengthOutput.innerHTML = this.value;
+					lockerLength =  parseInt(this.value)
+					var k = -((lockerLength*1020)/2)+2040+(1020/2)
+					remove("plane1");
+					createPlane((lockerLength*1020)+2000);
+					for ( let i = 1; i < 30; i ++ ) {
+						moduleSets[i].position.x = k;
+						if (i > lockerLength ) {
+							moduleSets[i].visible = false ;
+						} else {
+							moduleSets[i].visible = true ;
+						}
+					}
+				}
+
+				createLights();
+				createPlane(8000);
+				createDoors();
+				createModel(scene);
+				
+				
+				
+
+				raycaster = new THREE.Raycaster();
+
+				renderer = new THREE.WebGLRenderer({ antialias: true });
+				renderer.setPixelRatio( window.devicePixelRatio );
+				renderer.setSize( window.innerWidth, window.innerHeight );
+				renderer.outputEncoding = THREE.sRGBEncoding;
+				renderer.shadowMap.enabled = true;
+				renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+				container.appendChild( renderer.domElement );
+
+				controls = new TrackballControls( camera, renderer.domElement );
+
+				window.addEventListener( 'pointermove', onPointerMove, false );
+				window.addEventListener( 'resize', resize );
+
+			}
+
+			function remove(id) {
+
+				scene.remove(scene.getObjectByName(id));
+			}
+
+			function createLights() {
+				// Lights
+
+				const light = new THREE.DirectionalLight( 0xffffff, 1 );
+				light.position.set( -2, 4, -2 );
+				light.castShadow = true; // default false
+				light.shadow.mapSize.width = 512; // default
+				light.shadow.mapSize.height = 512; // default
+				light.shadow.camera.near = 0.5; // default
+				light.shadow.camera.far = 5000; // default
+				scene.add( light );
+
+			}
+
+			function createPlane(xWidth) {
+				// Ground
+				const planeGeometry = new THREE.PlaneGeometry( xWidth,4000 );
+				const planeMaterial = new THREE.MeshPhongMaterial( { color: 0x111111, specular: 0x111111, shininess: 10  } )
+				const plane = new THREE.Mesh( planeGeometry, planeMaterial );
+				plane.rotation.x = - Math.PI / 2;
+				plane.position.x = 0;
+				plane.position.z = 0;
+				plane.position.y = 0;	
+				plane.receiveShadow = true;
+				plane.name = "plane1"
+				scene.add( plane );
+			}
+
+
+			function createModel(scene) {
+				//let baseModule1
+				var j = (-((5*1020)/2)-(1020/2))
+
+				for ( let i = 1; i <= 30; i ++ ) {
+				var  loader = new STLLoader();
+
+				loader.load( "js/baseModel.stl", function (geometry) {
+					var material = new THREE.MeshPhongMaterial({ color: 0xe1e0de, transparent: true, opacity: 0.8 });
+					
+					var model = new THREE.Mesh(geometry, material);
+					model.rotation.set( - Math.PI / 1,  Math.PI / 1, - Math.PI / 2 );
+					model.position.set( (-(1020/2)*5)+(i*1020), 0, -1500 );
+					
+
+					const edges = new THREE.EdgesGeometry( geometry );
+					const line = new THREE.LineSegments( edges, new THREE.LineBasicMaterial( { color: 0x000000 } ) );
+					model.add( line );
+					
+					model.name = "base" + i
+					var group = new THREE.Group();
+					group.add(model);
+					var curDoor;
+					curDoor = doors[0].clone();
+					curDoor.position.x = (1020*i)+j;
+					group.add(curDoor);
+					
+
+					moduleSets[i] = group
+					scene.add(moduleSets[i] )
+					scene.selectableModule.push(model);
+
+					// esialgu näidatakse ainult 5 moodulit
+					if(i > 5 ){ moduleSets[i].visible = false};
+
+					});
+				}
+			}
+
+
+			function resize() {
+				camera.aspect = window.innerWidth / window.innerHeight;
+				camera.updateProjectionMatrix();
+				renderer.setSize( window.innerWidth, window.innerHeight );
+			}
+			
+
+			function animate() {		
+				requestAnimationFrame( animate );
+				controls.update();
+
+				render();
+			}
+
+
+			function onPointerMove( event ) {
+				event.preventDefault();
+				pointer.x = ( event.clientX / window.innerWidth ) * 2 - 1;
+				pointer.y = - ( event.clientY / window.innerHeight ) * 2 + 1;
+			}
+			
+
+			function render(){
+				raycaster.setFromCamera( pointer, camera );
+				var intersects = raycaster.intersectObjects( scene.selectableModule, true );
+				var intersects2 = raycaster.intersectObjects( scene.children, true );
+				var doorNames = ["XXXL","XXL", "XL", "L", "M", "S"]
+				var intersectedDoor
+
+				if ( intersects.length > 0 ) {
+					if ( INTERSECTED != intersects[ 0 ].object ) {
+						if ( INTERSECTED ) INTERSECTED.scale.set( 1,1,1 );
+						INTERSECTED = intersects[ 0 ].object;
+						INTERSECTED.scale.set( 1.2, 1, 1);
+					}
+				} else {
+					if ( INTERSECTED ) INTERSECTED.scale.set( 1,1,1 );
+					INTERSECTED = null
+				}
+
+				
+				if ( intersects2.length > 0 ) {
+					if ( INTERSECTED2 != intersects2[ 0 ].object ) {
+						if (doorNames.includes(intersects2[0].object.name) ){
+							if (INTERSECTED2) INTERSECTED2.children[0].material.color.set(INTERSECTED2.cornerColor)
+								INTERSECTED2 = intersects2[ 0 ].object;
+								INTERSECTED2.cornerColor = INTERSECTED2.children[0].material.color.getHex();
+								INTERSECTED2.material = INTERSECTED2.material.clone();
+								const colores = INTERSECTED2.children[0].material.clone();
+								colores.color.set( 0xff0000 );
+								INTERSECTED2.children[0].material = colores;
+								doorSelected = true
+								}
+					} else {
+						if (INTERSECTED2) INTERSECTED2.children[0].material.color.set(INTERSECTED2.cornerColor)
+							doorSelected = false
+							INTERSECTED2 = null
+					}	
+				}
+				renderer.render( scene, camera );
+			}
+
+
+			
+
+			document.onpointerdown = function(event) {
+				switch ( event.button ) {
+					case 0: 				
+						if (INTERSECTED != null){
+							var myIndex = doors.findIndex(x => x.name === INTERSECTED.parent.children[1].name) 
+							const v = new THREE.Vector3(0,0,0);
+							const v3 = new THREE.Vector3(0,0,0);
+							var supDoor = doors[cycleArray(myIndex, doors, 10)].clone();
+							var vpos = INTERSECTED.parent.children[1].getWorldPosition(v)
+							var vpos3 = INTERSECTED.parent.getWorldPosition(v3)
+							supDoor.position.set(vpos.x-vpos3.x, vpos.y, vpos.z);
+							INTERSECTED.parent.remove(INTERSECTED.parent.children[1]);
+							INTERSECTED.parent.add(supDoor) ;
+							countDoors();
+						}
+						break;
+					case 1: //console.log("Middle Button is down."); 
+						break;
+					case 2: //console.log("Right Button is down.");
+						if ( doorSelected == true){
+							if (INTERSECTED2.name != "S" && INTERSECTED2.name != "M" )
+								var myColorIndex = doorColors.findIndex(x => x === INTERSECTED2.material.color.getHex())
+								if (INTERSECTED2.name != "XXXL"){
+									INTERSECTED2.material.color.set( doorColors[cycleArray(myColorIndex, doorColors, 5)] )
+								} else{
+									INTERSECTED2.material.color.set( doorColors[cycleArray(myColorIndex, doorColors, 2)] )
+								}
+							countDoors();
+						}
+						break;
+				}
+			}
+
+
+			function cycleArray(count, name, max) {
+				count++;
+				if (count === name.length || count ===max ) {count = 0;}
+				return count
+			}
+
+			function createDoors() {
+				let doorData = [	[1005, 2060, 44, 0xe1e0de, 1075, "XXXL"],
+									[1005, 1155, 44, 0xe1e0de, 624, "XXL"],
+									[1005, 890, 44, 0xe1e0de, 1657, "XL"],
+									[497, 890, 44, 0xe1e0de, 1657, "L"],
+									[326, 890, 44, 0xe1e0de, 1657, "M"],
+									[497, 441, 44, 0xe1e0de, 1433, "S"]
+				]
+				for (let i=0; i < doorData.length; i++){
+				//uksed
+
+					var doorModuleGoeometry = new THREE.BoxGeometry( doorData[i][0], doorData[i][1], doorData[i][2] );
+					var doorModuleMmaterial = new THREE.MeshPhongMaterial({ color: doorData[i][3] })
+					var doorMesh = new THREE.Mesh(doorModuleGoeometry, doorModuleMmaterial)
+
+					doorMesh.position.x = 0;
+					doorMesh.position.y = doorData[i][4];
+					doorMesh.position.z = 1522;
+					doorMesh.name = doorData[i][5];
+
+					const edges = new THREE.EdgesGeometry( doorModuleGoeometry );
+					const line = new THREE.LineSegments( edges, new THREE.LineBasicMaterial( { color: 0x000000 } ) );
+					doorMesh.add( line );
+					
+					doorSamples[i] = doorMesh
+
+				}
+				var kickPlateGeometry = new THREE.BoxGeometry( 1000, 300, 2 );
+				var kickPlateMmaterial = new THREE.MeshPhongMaterial({ color: 0xcaccce })
+				var kickPlate = new THREE.Mesh(kickPlateGeometry, kickPlateMmaterial)
+
+				//XXXL uks
+				var drGroup = new THREE.Group();
+				var xxxlDoor = doorSamples[0].clone()
+				drGroup.add(xxxlDoor)
+				var kp = kickPlate.clone();
+				kp.position.x = 0;
+				kp.position.y = 200;
+				kp.position.z = 1546;
+				drGroup.add(kp);
+				drGroup.name = "XXXL_Group"
+				doors[0] = drGroup;
+				//XL uks
+				var drGroup = new THREE.Group();
+				var xxlDoor = doorSamples[1].clone()
+				drGroup.add(xxlDoor)
+				var kp = kickPlate.clone()
+				kp.position.x = 0;
+				kp.position.y = 200;
+				kp.position.z = 1546;
+				drGroup.name = "XL_Group"
+				var xlDoor = doorSamples[2].clone()
+				drGroup.add(xlDoor)
+				drGroup.add(kp)
+				doors[1] = drGroup
+				//L uks
+				var drGroup = new THREE.Group();
+				var xxlDoor = doorSamples[1].clone()
+				drGroup.add(xxlDoor)
+				var kp = kickPlate.clone()
+				kp.position.x = 0;
+				kp.position.y = 200;
+				kp.position.z = 1546;
+				var lDoor = doorSamples[3].clone()
+				lDoor.position.x = -245;
+				var lDoor2 = doorSamples[3].clone()
+				lDoor2.position.x = +245;
+				drGroup.add(lDoor)
+				drGroup.add(lDoor2)
+				drGroup.add(kp)
+				drGroup.name = "L_Group"
+				doors[2] = drGroup
+				//M uks
+				var drGroup = new THREE.Group();
+				var xxlDoor = doorSamples[1].clone()
+				drGroup.add(xxlDoor)
+				var kp = kickPlate.clone()
+				kp.position.x = 0;
+				kp.position.y = 200;
+				kp.position.z = 1546;
+				var mDoor = doorSamples[4].clone()
+				mDoor.position.x = -339;
+				var mDoor2 = doorSamples[4].clone()
+				mDoor2.position.x = +339;
+				var mDoor3 = doorSamples[4].clone()
+				mDoor3.position.x = 0;
+				drGroup.add(mDoor)
+				drGroup.add(mDoor2)
+				drGroup.add(mDoor3)
+				drGroup.add(kp)
+				drGroup.name = "M_Group"
+				doors[3] = drGroup
+				//S uks
+				var drGroup = new THREE.Group();
+				var xxlDoor = doorSamples[1].clone()
+				drGroup.add(xxlDoor)
+				var kp = kickPlate.clone()
+				kp.position.x = 0;
+				kp.position.y = 200;
+				kp.position.z = 1546;
+				var sDoor = doorSamples[5].clone()
+				sDoor.position.x = -254;
+				var sDoor2 = doorSamples[5].clone()
+				sDoor2.position.x = -254;
+				sDoor2.position.y = 1883;
+				var sDoor3 = doorSamples[5].clone()
+				sDoor3.position.x = 254;
+				sDoor3.position.y = 1883;
+				var sDoor4 = doorSamples[5].clone()
+				sDoor4.position.x = 254;
+				drGroup.add(sDoor)
+				drGroup.add(sDoor2)
+				drGroup.add(sDoor3)
+				drGroup.add(sDoor4)
+				drGroup.add(kp)
+				drGroup.name = "S_Group"
+				doors[4] = drGroup
+
+				}
+			
+
+			function countDoors (){
+				//kokku
+				var xxxlDoorsCount = document.getElementById("xxxlDoorsCount");
+				var xxlDoorsCount = document.getElementById("xxlDoorsCount");
+				var xlDoorsCount = document.getElementById("xlDoorsCount");
+				var lDoorsCount = document.getElementById("lDoorsCount");
+				var mDoorsCount = document.getElementById("mDoorsCount");
+				var sDoorsCount = document.getElementById("sDoorsCount");
+				//värvilised
+				var sDoorsCountw = document.getElementById("sDoorsCountw");
+				var mDoorsCountw = document.getElementById("mDoorsCountw");
+				var lDoorsCountw = document.getElementById("lDoorsCountw");
+				var lDoorsCounty = document.getElementById("lDoorsCounty");
+				var lDoorsCountb = document.getElementById("lDoorsCountb");
+				var xlDoorsCountw = document.getElementById("xlDoorsCountw");
+				var xlDoorsCounty = document.getElementById("xlDoorsCounty");
+				var xlDoorsCountb = document.getElementById("xlDoorsCountb");
+				var xxlDoorsCountw = document.getElementById("xxlDoorsCountw");
+				var xxlDoorsCounty = document.getElementById("xxlDoorsCounty");
+				var xxlDoorsCountb = document.getElementById("xxlDoorsCountb");
+				var xxxlDoorsCountw = document.getElementById("xxxlDoorsCountw");
+				var xxxlDoorsCounty = document.getElementById("xxxlDoorsCounty");
+
+				var difDoorsCounts =[	["XXXL", xxxlDoorsCount],
+										["XXL", xxlDoorsCount],
+										["XL", xlDoorsCount],
+										["L", lDoorsCount],
+										["M", mDoorsCount],
+										["S", sDoorsCount]
+									]
+				var difColorDoorsCounts =[	["L", lDoorsCountw, 0xe1e0de ],
+											["L", lDoorsCounty, 0xf4db14 ],
+											["L", lDoorsCountb, 0x005ea0 ],
+											["XL", xlDoorsCountw, 0xe1e0de ],
+											["XL", xlDoorsCounty, 0xf4db14 ],
+											["XL", xlDoorsCountb, 0x005ea0],
+											["XXL", xxlDoorsCountw, 0xe1e0de ],
+											["XXL", xxlDoorsCounty, 0xf4db14 ],
+											["XXL", xxlDoorsCountb, 0x005ea0 ],
+											["XXXL", xxxlDoorsCountw, 0xe1e0de ],
+											["XXXL", xxxlDoorsCounty, 0xf4db14 ]
+										]
+				
+				for (let i = 0; i < difDoorsCounts.length; i++){
+					var cnt = 0
+					scene.traverse(function(mesh) {
+						if (mesh.name === difDoorsCounts[i][0]) {
+							if (mesh.parent.parent.visible == true){
+								cnt += 1
+						}}
+					});
+					difDoorsCounts[i][1].innerHTML = cnt
+				}
+				for (let i = 0; i < difColorDoorsCounts.length; i++){
+						var cnt = 0
+						scene.traverse(function(mesh) {
+							if (mesh.name === difColorDoorsCounts[i][0]) {
+								if (mesh.parent.parent.visible == true){
+									if (mesh.material.color.getHex() == difColorDoorsCounts[i][2]){
+										console.log(mesh.color)
+									cnt += 1
+							}}}
+						});
+						difColorDoorsCounts[i][1].innerHTML = cnt
+				}
+				sDoorsCountw.innerHTML = sDoorsCount.innerHTML
+				mDoorsCountw.innerHTML = mDoorsCount.innerHTML
+			}
+
+
+		</script>
+		<div style="position: absolute; top: 20px; left: 20px; text-align: left;">
+		<h1 style="color:black;">PUL Length</h1>
+		<input type="range" min="4" max="30" value="5" class="slider" id="locker_length">
+		<p style="color:black;">Modules: <span id="locker_length_out"></span></p>
+		<button id="button1" class="camera-button">Front View</button>
+		<style>
+			th {
+			border: 1px solid black;
+			border-radius: 5px;
+			text-align: center;
+			width: 100px
+			}
+			td {
+			border: 1px solid black;
+			border-radius: 10px;
+			text-align: center;
+			width: 50px
+			}
+		</style>
+		<table>
+			<tr>
+				<th>Door Layout</th>
+				<td>SUM</td>
+				<td>White</td>
+				<td>Yellow</td>
+				<td>Blue</td>
+			</tr>
+			<tr>
+				<th>S-Door</th>
+				<td><span id="sDoorsCount">0</span></td>
+				<td><span id="sDoorsCountw">0</span></td>
+				<td>X</td>
+				<td>X</td>
+			</tr>
+			<tr>
+				<th>M-Door</th>
+				<td><span id="mDoorsCount">0</span></td>
+				<td><span id="mDoorsCountw">0</span></td>
+				<td>X</td>
+				<td>X</td>
+			</tr>
+			<tr>
+				<th>L-Door</th>
+				<td><span id="lDoorsCount">0</span></td>
+				<td><span id="lDoorsCountw">0</span></td>
+				<td><span id="lDoorsCounty">0</span></td>
+				<td><span id="lDoorsCountb">0</span></td>
+			</tr>
+			<tr>
+				<th>XL-Door</th>
+				<td><span id="xlDoorsCount">0</span></td>
+				<td><span id="xlDoorsCountw">0</span></td>
+				<td><span id="xlDoorsCounty">0</span></td>
+				<td><span id="xlDoorsCountb">0</span></td>
+			</tr>
+			<tr>
+				<th>XXL-Door</th>
+				<td><span id="xxlDoorsCount">0</span></td>
+				<td><span id="xxlDoorsCountw">0</span></td>
+				<td><span id="xxlDoorsCounty">0</span></td>
+				<td><span id="xxlDoorsCountb">0</span></td>
+			</tr>
+			<tr>
+				<th>XXXL-Door</th>
+				<td><span id="xxxlDoorsCount">5</span></td>
+				<td><span id="xxxlDoorsCountw">5</span></td>
+				<td><span id="xxxlDoorsCounty">0</span></td>
+				<td>X</td>
+			</tr>
+		  </table>
+		</div>
+	
+
+</body></html>
