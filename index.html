@@ -148,7 +148,7 @@
 				for ( let i = 1; i <= 30; i ++ ) {
 				var  loader = new STLLoader();
 
-				loader.load( "js/baseModel.stl", function (geometry) {
+				loader.load( "https://github.com/tarmo-clv/tarmo-clv.github.io/blob/4bf6d5900de88a72b32ad0a7c982d0ab26c086fd/js/baseModel.STL", function (geometry) {
 					var material = new THREE.MeshPhongMaterial({ color: 0xe1e0de, transparent: true, opacity: 0.8 });
 					
 					var model = new THREE.Mesh(geometry, material);
