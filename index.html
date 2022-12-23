@@ -148,7 +148,7 @@
 				for ( let i = 1; i <= 30; i ++ ) {
 				var  loader = new STLLoader();
 
-				loader.load( "https://github.com/tarmo-clv/tarmo-clv.github.io/blob/main/js/baseModel.STL", function (geometry) {
+				loader.load( "https://tarmo-clv.github.io/js/baseModel.STL", function (geometry) {
 					var material = new THREE.MeshPhongMaterial({ color: 0xe1e0de, transparent: true, opacity: 0.8 });
 					
 					var model = new THREE.Mesh(geometry, material);
@@ -466,7 +466,6 @@
 							if (mesh.name === difColorDoorsCounts[i][0]) {
 								if (mesh.parent.parent.visible == true){
 									if (mesh.material.color.getHex() == difColorDoorsCounts[i][2]){
-										console.log(mesh.color)
 									cnt += 1
 							}}}
 						});
