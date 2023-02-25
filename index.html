@@ -432,7 +432,7 @@
 				var  loader = new STLLoader();
 				let modelsList =["https://tarmo-clv.github.io/js/IDSS.STL", "https://tarmo-clv.github.io/js/IDSS_B1.STL", "https://tarmo-clv.github.io/js/IDDS.STL", "https://tarmo-clv.github.io/js/IDDS_B1.STL", "https://tarmo-clv.github.io/js/IDDS_B2.STL", "https://tarmo-clv.github.io/js/IDDS_B3.STL", "https://tarmo-clv.github.io/js/IDSS_B2.STL", "https://tarmo-clv.github.io/js/IDSS_B3.STL", "https://tarmo-clv.github.io/js/ODSS.STL", "https://tarmo-clv.github.io/js/ODDS.STL" ]
 
-				loader.load( "https://tarmo-clv.github.io/js/ROOF.stl", function (geometry) {
+				loader.load( "https://tarmo-clv.github.io/js/ROOF.STL", function (geometry) {
 					var material = new THREE.MeshBasicMaterial({ color: 0xe1e0de, transparent: true, opacity: 1 });
 					var roof = new THREE.Mesh(geometry, material);
 					roof.rotation.set( - Math.PI / 2,  Math.PI / 1, - Math.PI / 1 );
