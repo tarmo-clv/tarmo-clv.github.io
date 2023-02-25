@@ -1,0 +1,154 @@
+
+body {
+    margin: 0;
+    font-family: calibri;
+    color: black;
+    overflow: hidden;
+    font-size: 14px; 
+}
+
+
+th {
+    border: 1px solid black;
+    border-radius: 5px;
+    text-align: center;
+    font-size: 14px;
+    width: 98px;
+    font-weight: bold;
+}
+
+.front_td {
+    border: 1px solid black;
+    border-radius: 5px;
+    text-align: center;
+    font-size: 14px;
+    width: 145px;
+    font-weight: bold;
+}
+
+td {
+    border: 1px solid black;
+    border-radius: 10px;
+    text-align: center;
+    width: 46px;
+    
+    font-size: 14px
+}
+
+.td_top {
+    border: 1px solid black;
+    border-radius: 10px;
+    text-align: center;
+    width: 46px;
+    font-weight: bold;
+    font-size: 12px
+}
+
+
+.button {
+    font-family: calibri;
+    background-color: #b7d7e8; 
+    border: 1px solid black;
+    border-radius: 5px;
+    color: rgb(0, 0, 0);
+    padding: 5px 0px;
+    text-align: center;
+    text-decoration: none;
+    display: inline-block;
+    font-size: 14px;
+    margin: 4px 2px;
+    transition-duration: 0.4s;
+    cursor: pointer;
+    width: 150px;
+}
+
+
+.button:hover {
+    background-color: #555555;
+    color: white;
+}
+
+.wrapper {
+    display: flex;
+    height: 100vh;
+}
+
+.main {
+    display: flex;
+    flex-grow: 1;
+}
+
+
+.side-panel-toggle {
+    width: 40px;
+    height: 40px;
+    flex-shrink: 0;
+    display: grid;
+    place-items: center;
+    color: #ffffff;
+    background: #87bdd8;
+    border: none;
+    border-radius: 0 5px 5px 0;
+    outline: none;
+    cursor: pointer;
+    position: absolute;
+}
+  
+.side-panel-toggle:hover {
+    background: #87bdd8;
+}
+  
+.sp-icon-close {
+    display: none !important;
+}
+  
+.side-panel {
+    display: none;
+    width: 300px;
+    flex-shrink: 0;
+    padding: 15px;
+    color: #000000;
+    background: #deebed;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.35);
+    position: absolute;
+}
+  
+.side-panel-open .side-panel {
+    display: initial;
+}
+  
+.side-panel-open .sp-icon-open {
+    display: none !important;
+}
+  
+.side-panel-open .sp-icon-close {
+    display: initial !important;
+}
+
+ul {
+    position: absolute;
+    right: 50px;
+}
+
+dt, dd {
+    display: inline;
+    margin: 0;
+  }
+
+.dot {
+    height: 17px;
+    width: 17px;
+    border-radius: 50%;
+    display: inline-block;
+
+}
+
+
+/*
+HEX: #cfe0e8
+
+HEX: #b7d7e8
+
+HEX: #87bdd8
+
+HEX: #daebe8

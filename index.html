@@ -1,11 +1,25 @@
 <!DOCTYPE html>
-<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<system.webServer>
+
+	<httpProtocol>
+	  <customHeaders>
+		<add name="Access-Control-Allow-Origin" value="*" />
+		<add name="Access-Control-Allow-Headers" value="Content-Type" />
+		<add name="Access-Control-Allow-Methods" value="GET, POST, PUT, DELETE, OPTIONS" />
+	  </customHeaders>
+	</httpProtocol>
+</system.webServer>
+<html lang="en">
+<head>
+		<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+		<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 		<title>Demo Konfiguraator</title>
-		
 		<meta name="viewport" content="width=device-width, user-scalable=yes, minimum-scale=1.0, maximum-scale=1.0">
 		<link type="text/css" rel="stylesheet" href="./main.css">
-
+		
+</head>
 	<body>
+
 		<script async src="https://unpkg.com/es-module-shims@1.3.6/dist/es-module-shims.js"></script>
 		<script type="importmap">
 			{
@@ -16,120 +30,377 @@
 			}
 		</script>
 
-		<script type="module">
+		<script async type="module">
 
-			import * as THREE from  'three'
-			import   {STLLoader}  from "three/examples/jsm/loaders/STLLoader.js"
-			import   {TrackballControls}   from "three/examples/jsm/controls/TrackballControls.js"
 
-			let container, controls;
+			import * as THREE from  'three';
+			import {STLLoader}  from "three/examples/jsm/loaders/STLLoader.js";
+			import { FontLoader } from 'three/examples/jsm/loaders/FontLoader.js';
+			import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+
+
+			let controls;
 			let camera, scene, renderer, raycaster;
-			let guiData;
+			let guiData ;
 
 			let INTERSECTED = null;
 			let INTERSECTED2 = null;
+			let INTERSECTED1 = null;
+			let INTERSECTED3 = null;
+			let INTERSECTED4 = null;
 
 			const pointer = new THREE.Vector2();
 			var moduleSets = [];
 			var doorSelected
-			var doorColors = [0xe1e0de, 0xf4db14, 0x005ea0]
+			var doorColors = [0xe1e0de, 0xf4db14, 0x005ea0];
 			var doors = [];
+			var consoleDoors = [];
 			var doorSamples = [];	
-			
+			var modelsGroup = [];
+			var singleState = true;
+			var outdoorState = false;
+			var bubbleState = true;
+			let gaps = [];
+			let posts = [];
+			var ROOF;
+			const replacementModule = {0:2, 1:3, 2:0, 3:1, 4:6, 5:7, 6:4, 7:5, 8:9, 9:8}; //mis moodul teise asemele läheb
+			var lengthInput = document.getElementById("locker_length");
+			var lengthOutput = document.getElementById("locker_length_out");
+			var postsCount = document.getElementById("postsCount");
+			var doublePostsCount = document.getElementById("doublePostsCount");
+			var gapsCount = document.getElementById("gapsCount");
+			const allowedModules = ['base0', 'base2','base8', 'base9' ];
+			var doorNames = ["XXXL","XXL", "XL", "L", "M", "S"];
+			var imData0 = [];
+			var imData1 = [];
+			var imData2 = [];
+			var imData3 = [];
+			var imData4 = Boolean;
+			var imData5 = Boolean;
+			var imData6 = 0;
+			var imData7 = 0;
+
+
 			init();
 			animate();
 
 			function init() {
+				THREE.Cache.enabled = true;
+				camera = new THREE.PerspectiveCamera( 50, window.innerWidth / window.innerHeight, 1000, 50000 );
+				camera.position.set(0, 1000, 10000);
+				document.getElementById("exportScene").addEventListener("click", exportSceneTXT, false);
 
-				container = document.createElement( 'div' );
-				document.body.appendChild( container );
+				var importInput = document.getElementById('importTXT');
+       			importInput.addEventListener('change', evt => {
+					var file = evt.target.files[0];
+					var reader = new FileReader();
+					reader.addEventListener('load', event => {
+						
+						var contents = event.currentTarget;
+						const lines = contents.result.split("\n");
+						imData0 = eval(`new Array(${lines[0].replace(/^\[|\]$/g, '')})`);
+						imData1 = eval(`new Array(${lines[1].replace(/^\[|\]$/g, '')})`);
+						imData2 = eval(`new Array(${lines[2].replace(/^\[|\]$/g, '')})`);
+						imData3 = eval(`new Array(${lines[3].replace(/^\[|\]$/g, '')})`);
+						imData4 = lines[4].match(/false/ig)?false:true;
+						imData5 = lines[5].match(/false/ig)?false:true;
+						imData6 = eval(lines[6]);
+						imData7 = eval(lines[7]);
+						createNewScene();
+					});
+					reader.readAsBinaryString( file );
+					
+				});
+				
 
-				camera = new THREE.PerspectiveCamera( 50, window.innerWidth / window.innerHeight, 1000, 40000 );
-				camera.position.set(0, 1000, 10000)
 				document.getElementById("button1").addEventListener("click", frontView, false);
 				function frontView() {
-					camera.position.set(0, 1000, 10000)
-					camera.rotation.set(0, 0, 0)
-					camera.up.set(0, 0, 0)
-					controls.reset();
+					camera.position.set(0, 1000, 10000);
+					camera.rotation.set(0, 0.01, 0);
+					camera.up.set(0, 0.01, 0);
+					controls.update();
+				};
+
+				document.getElementById("button4").addEventListener("click", backView, false);
+				function backView() {
+					camera.position.set(0, 2500, -10000);
+					camera.rotation.set(-3.14, 0, -3.14);
+					camera.up.set(0, 1, 0);
+					controls.update();
+				};
+
+				document.getElementById("button0").addEventListener("click", hideBubbles, false);
+				function hideBubbles() {
+					bubbleState = !bubbleState;
+					scene.traverse(function(object) {
+					if ((object.name == 'BUBBLE' ) && bubbleState == false) {
+						object.visible = false;
+					} else if ((object.name == 'BUBBLE' ) && bubbleState == true ) {
+						object.visible = true;
+					};
+				});
+				};
+
+
+				document.getElementById("button2").addEventListener("click", InOut, false);
+				function InOut() {
+					outdoorState = !outdoorState;
+					if (outdoorState == true){
+						posts = [];
+						if (gaps.length != 0){restoreGaps(-1)};
+						gaps = [];
+						createRoof();
+					} else {
+						remove('ROOF_TOP');
+					};
+										 
+					for ( let i = 1; i < 31; i ++ ) {
+						if (singleState == true && outdoorState == true){
+							moduleSets[i].children[5].children[1].visible = false;
+							moduleSwitchSub(moduleSets[i], 8);
+							moduleSets[i].children[0].children[1].visible = true;
+						} else if (singleState == true && outdoorState == false) {
+							moduleSets[i].children[5].children[1].visible = false;
+							moduleSwitchSub(moduleSets[i], 0);
+							moduleSets[i].children[0].children[1].visible = false;
+						} else if (singleState == false && outdoorState == true) {
+							moduleSets[i].children[5].children[1].visible = true;
+							moduleSwitchSub(moduleSets[i], 9);
+							moduleSets[i].children[0].children[1].visible = true;
+						} else if (singleState == false && outdoorState == false) {
+							moduleSets[i].children[5].children[1].visible = true;
+							moduleSwitchSub(moduleSets[i], 2);
+							moduleSets[i].children[0].children[1].visible = false;
+						};
+					};
+					gapBubbles();
 				}
 
+				document.getElementById("button3").addEventListener("click", singleDouble, false);
+				function singleDouble() {
+					singleState = !singleState;
+					for ( let i = 1; i < 31; i ++ ) {
+						moduleSwitchSub(moduleSets[i], replacementModule[parseInt(moduleSets[i].children[0].name.split('base')[1])]);
+						if (outdoorState == true){ moduleSets[i].children[0].children[1].visible = true };
+						if (singleState == true){
+							moduleSets[i].children[5].children[1].visible = false;
+						} else {
+							moduleSets[i].children[5].children[1].visible = true;
+						};
+					};
+					countDoors();
+				};
+				
 				scene = new THREE.Scene();
-				scene.background = new THREE.Color( 0xdeebed );
-				scene.add( new THREE.HemisphereLight() );
-				scene.fog = new THREE.Fog( 0x72645b, 10000, 50000 );
+				window.scene = scene
+				scene.background = new THREE.Color( 0xcfe0e8 );
+				scene.fog = new THREE.Fog( 0x72645b, 10000, 70000 );
 				scene.selectableModule = [];
+				scene.selectableModule1 = [];
+				scene.selectableModule2 = [];
+				scene.selectableModule3 = [];
+				
 
 				//pikkuse valikud
-				var lengthInput = document.getElementById("locker_length");
-				var lengthOutput = document.getElementById("locker_length_out");
-				var lockerLength = 0
+				var lockerLength = 0;
 				lengthOutput.innerHTML = lengthInput.value; 
 				lengthInput.oninput = function() {
-					countDoors();
+
 					lengthOutput.innerHTML = this.value;
-					lockerLength =  parseInt(this.value)
+					lockerLength =  parseInt(this.value) 
 					var k = -((lockerLength*1020)/2)+2040+(1020/2)
 					remove("plane1");
 					createPlane((lockerLength*1020)+2000);
-					for ( let i = 1; i < 30; i ++ ) {
+					for ( let i = 1; i < 31; i ++ ) {
 						moduleSets[i].position.x = k;
 						if (i > lockerLength ) {
 							moduleSets[i].visible = false ;
 						} else {
 							moduleSets[i].visible = true ;
-						}
+						};
+					countDoors();
 					}
+					if (gaps.length != 0){
+						restoreGaps(1)
+					};
+					if (posts.length !=0){
+						restorePosts()
+					};
+					if (outdoorState == true){
+						remove('ROOF_TOP')
+						createRoof()
+					};
+					gapBubbles();
 				}
+				
 
 				createLights();
 				createPlane(8000);
 				createDoors();
-				createModel(scene);
+				createModels(scene)
+					.then(() => createModel(scene))
+					.then(() => gapBubbles())
 				
-				
-				
-
 				raycaster = new THREE.Raycaster();
 
 				renderer = new THREE.WebGLRenderer({ antialias: true });
-				renderer.setPixelRatio( window.devicePixelRatio );
-				renderer.setSize( window.innerWidth, window.innerHeight );
+				renderer.setPixelRatio( window.innerWidth/ window.innerHeight );
+				renderer.setSize(window.innerWidth, window.innerHeight);
 				renderer.outputEncoding = THREE.sRGBEncoding;
 				renderer.shadowMap.enabled = true;
 				renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-				container.appendChild( renderer.domElement );
+				document.getElementById('canvas').appendChild( renderer.domElement ); //kui tahata panna three kuhugile kindlasse divi
 
-				controls = new TrackballControls( camera, renderer.domElement );
+				controls = new OrbitControls( camera, renderer.domElement );
+				controls.minDistance = 5000;
+				controls.maxDistance = 30000;
+				controls.minPolarAngle = Math.PI /4;
+				controls.maxPolarAngle = Math.PI /2.1;
+				controls.enableDamping = true;
+				controls.dampingFactor = 0.2;
+
 
 				window.addEventListener( 'pointermove', onPointerMove, false );
 				window.addEventListener( 'resize', resize );
 
-			}
+			};
+
+			function createNewScene() {
+				singleState = imData4;
+				outdoorState = imData5;
+				posts = [];
+				gaps = [];
+				
+				for (let i = 1; i < (imData0.length+1); i++){
+					var baseNumbermodule = scene.getObjectByName("moduleSets" + i);
+					moduleSwitchSub(baseNumbermodule, imData0[i-1][0]);
+					baseNumbermodule.visible = imData0[i-1][1];
+					doorLayoutChange(baseNumbermodule.children[5], imData0[i-1][2]-1);
+					
+					var cnt = 0;
+					baseNumbermodule.traverse(function(object){
+						if (doorNames.includes(object.name)) {
+							object.material = object.material.clone();
+							object.material.color.set( doorColors[imData1[i-1][cnt]] );
+							cnt += 1;
+						};
+					});
+					
+					if (outdoorState == true){ 
+						baseNumbermodule.children[0].children[1].visible = true;
+					};
+					if (singleState == true){
+						baseNumbermodule.children[5].children[1].visible = false;
+					} else {
+						baseNumbermodule.children[5].children[1].visible = true;
+					};
+					if (i == imData6){
+						changeConsole(baseNumbermodule);
+					};
+					if (imData2.includes(i)) {
+						gaps.push(baseNumbermodule);
+						baseNumbermodule.children[4].position.x += 1020/2;
+						baseNumbermodule.children[4].position.y -= 1800;
+					};
+					if (imData3.includes(i)) {
+						posts.push(baseNumbermodule);
+					};
+				};
+				lengthInput.value = imData7;
+				lengthInput.dispatchEvent(new Event('input' ));
+
+				if (outdoorState == true){ 
+					remove('ROOF_TOP');
+					createRoof();
+				};
+				remove("plane1");
+				createPlane(((imData7+gaps.length)*1020)+2000);
+			};
+
+			function exportSceneTXT() {
+				var exData0 = [];
+				var exData1 = [];
+				var exData2 = [];
+				var exData3 = 0;
+				var exData4 = [];
+				
+				
+				for ( let i = 1; i < 31; i ++ ) {
+					var baseNumbermodule = scene.getObjectByName("moduleSets" + i);
+					var baseNumberDoorsNumber = doors.findIndex(x => x.name === baseNumbermodule.children[5].children[0].name);
+					var baseNumber =  parseInt(baseNumbermodule.children[0].name.split('base')[1]);
+					exData0.push([baseNumber, baseNumbermodule.visible, baseNumberDoorsNumber] );
+
+					var temp6 = []
+					baseNumbermodule.traverse(function(object){
+						if (doorNames.includes(object.name)) {
+							//console.log(object.material.color)
+							if (object.material.color.getHex() == 0xe1e0de){
+								temp6.push(0);
+							} else if (object.material.color.getHex() == 0xf4db14){
+								temp6.push(1);
+							} else if (object.material.color.getHex() == 0x005ea0){
+								temp6.push(2);
+							};
+						};
+					});
+					exData4.push(temp6);
+
+					baseNumbermodule.children[5].traverse(function(object){
+						if (object.name == 'CONSOLE' && object.visible == true) {
+							exData3 = i;
+						};
+					});
+				};
+				if (gaps.length !=0){
+						for ( let i = 0; i < gaps.length; i ++ ){
+							exData1.push(parseInt(gaps[i].name.split('moduleSets')[1]));
+						};
+					};
+				if (posts.length !=0){
+					for ( let i = 0; i < posts.length; i ++ ){
+						exData2.push(parseInt(posts[i].name.split('moduleSets')[1]));
+					};
+				};
+				var lockerLength =  parseInt(lengthInput.value)
+				var exportfileName = document.getElementById("exportSceneName").value + ".txt"
+				if (exportfileName == '.txt'){exportfileName = 'default.txt'}
+				var link = document.createElement("a");
+				var json = 	JSON.stringify(exData0) + '\n' + 
+							JSON.stringify(exData4) + '\n' + 
+							JSON.stringify(exData1) + '\n' + 
+							JSON.stringify(exData2) + '\n' + 
+							JSON.stringify(singleState) + '\n' + 
+							JSON.stringify(outdoorState) + '\n' + 
+							JSON.stringify(exData3) + '\n' +
+							JSON.stringify(lockerLength), 
+				blob = new Blob([json], {type: "octet/stream"}),
+				url = window.URL.createObjectURL(blob);
+				link.href = url;
+				link.download = exportfileName;
+				link.click();
+				window.URL.revokeObjectURL(url);
+			};
+
 
 			function remove(id) {
-
 				scene.remove(scene.getObjectByName(id));
-			}
+			};
 
 			function createLights() {
 				// Lights
-
-				const light = new THREE.DirectionalLight( 0xffffff, 1 );
-				light.position.set( -2, 4, -2 );
-				light.castShadow = true; // default false
-				light.shadow.mapSize.width = 512; // default
-				light.shadow.mapSize.height = 512; // default
-				light.shadow.camera.near = 0.5; // default
-				light.shadow.camera.far = 5000; // default
+				const light = new THREE.DirectionalLight( 0xffffff, 2 );
+				light.position.set( -5000, 5000, -15000 );
 				scene.add( light );
-
-			}
+				const light1 = new THREE.DirectionalLight( 0xffffff, 2 );
+				light1.position.set( 5000, 5000, 15000 );
+				scene.add( light1 );
+			};
 
 			function createPlane(xWidth) {
 				// Ground
 				const planeGeometry = new THREE.PlaneGeometry( xWidth,4000 );
-				const planeMaterial = new THREE.MeshPhongMaterial( { color: 0x111111, specular: 0x111111, shininess: 10  } )
+				const planeMaterial = new THREE.MeshBasicMaterial( { color: 0x999184   } )
 				const plane = new THREE.Mesh( planeGeometry, planeMaterial );
 				plane.rotation.x = - Math.PI / 2;
 				plane.position.x = 0;
@@ -137,90 +408,217 @@
 				plane.position.y = 0;	
 				plane.receiveShadow = true;
 				plane.name = "plane1"
+				var loader = new FontLoader();
+					loader.load( 'https://threejs.org/examples/fonts/helvetiker_regular.typeface.json', function ( font ) {   
+						var inpText = [['FRONT', 0, 1, -1900], ['BACK', 3.14, -1, 1900]];
+						for(let i=0; i < inpText.length; i++){
+							var textsShapes = font.generateShapes( inpText[i][0], 200 );
+							var textsGeometry = new THREE.ShapeGeometry( textsShapes );    
+							var textsMaterial = new THREE.MeshBasicMaterial({color: 0x000000});
+							var text = new THREE.Mesh(textsGeometry, textsMaterial);
+							textsGeometry.computeBoundingBox();
+							const centerOffset = - 0.5 * ( textsGeometry.boundingBox.max.x - textsGeometry.boundingBox.min.x );
+							text.rotation.set(0, 0, inpText[i][1]);
+							text.position.set(inpText[i][2]*centerOffset, inpText[i][3], 10);
+							plane.add(text);
+						};
+					}); 
 				scene.add( plane );
-			}
+			};
 
-
-			function createModel(scene) {
-				//let baseModule1
-				var j = (-((5*1020)/2)-(1020/2))
-
-				for ( let i = 1; i <= 30; i ++ ) {
+			
+			async function createModels(scene) {
+				// kõikvõimalikud baasmudelid laetakse korraga
 				var  loader = new STLLoader();
+				let modelsList =["https://tarmo-clv.github.io/js/IDSS.STL", "https://tarmo-clv.github.io/js/IDSS_B1.STL", "https://tarmo-clv.github.io/js/IDDS.STL", "https://tarmo-clv.github.io/js/IDDS_B1.STL", "https://tarmo-clv.github.io/js/IDDS_B2.STL", "https://tarmo-clv.github.io/js/IDDS_B3.STL", "https://tarmo-clv.github.io/js/IDSS_B2.STL", "https://tarmo-clv.github.io/js/IDSS_B3.STL", "https://tarmo-clv.github.io/js/ODSS.STL", "https://tarmo-clv.github.io/js/ODDS.STL" ]
 
-				loader.load( "https://tarmo-clv.github.io/js/baseModel.STL", function (geometry) {
-					var material = new THREE.MeshPhongMaterial({ color: 0xe1e0de, transparent: true, opacity: 0.8 });
-					
-					var model = new THREE.Mesh(geometry, material);
-					model.rotation.set( - Math.PI / 1,  Math.PI / 1, - Math.PI / 2 );
-					model.position.set( (-(1020/2)*5)+(i*1020), 0, -1500 );
-					
-
+				loader.load( "https://tarmo-clv.github.io/js/ROOF.stl", function (geometry) {
+					var material = new THREE.MeshBasicMaterial({ color: 0xe1e0de, transparent: true, opacity: 1 });
+					var roof = new THREE.Mesh(geometry, material);
+					roof.rotation.set( - Math.PI / 2,  Math.PI / 1, - Math.PI / 1 );
+					roof.position.set(110,1020,0);
 					const edges = new THREE.EdgesGeometry( geometry );
 					const line = new THREE.LineSegments( edges, new THREE.LineBasicMaterial( { color: 0x000000 } ) );
-					model.add( line );
-					
-					model.name = "base" + i
-					var group = new THREE.Group();
-					group.add(model);
-					var curDoor;
-					curDoor = doors[0].clone();
-					curDoor.position.x = (1020*i)+j;
-					group.add(curDoor);
-					
+					roof.add( line );
+					roof.name = "ROOF";
+					roof.visible = false;
+					ROOF = roof;
+					});
 
-					moduleSets[i] = group
-					scene.add(moduleSets[i] )
-					scene.selectableModule.push(model);
-
-					// esialgu näidatakse ainult 5 moodulit
-					if(i > 5 ){ moduleSets[i].visible = false};
-
+				for (let i=0; i < modelsList.length; i++){
+					await new Promise(resolve => {
+						loader.load( modelsList[i], function (geometry) {
+							var material = new THREE.MeshBasicMaterial({ color: 0xe1e0de, transparent: true, opacity: 1 });
+							var model = new THREE.Mesh(geometry, material);
+							model.rotation.set( - Math.PI / 2,  0, - Math.PI / 2 );
+							const edges = new THREE.EdgesGeometry( geometry );
+							const line = new THREE.LineSegments( edges, new THREE.LineBasicMaterial( { color: 0x000000} ) );
+							
+							model.add( line );
+							model.add(ROOF.clone());
+							model.name = "base" + i;
+							model.visible = false;
+							modelsGroup[i] = model;
+							resolve();
+						});
 					});
 				}
 			}
 
+			function createModel(scene) {
+				//tekitatakse moodulid ja esialgu lisatakse ühepoolse sisemasina baasmudel
+				var j = (-((5*1020)/2)-(1020/2));
+				for ( let i = 1; i <= 30; i ++ ) {
+					var group = new THREE.Group();
+					group.name = 'module' + i;
+					//lisatakse baasmudel
+					var model = modelsGroup[0].clone();
+					model.position.set( (-(1020/2)*7)+(i*1020), 0, -1544-15 );
+					model.visible = true;
+					group.add(model);
+					//ülemine mull
+					const sphereGeometry = new THREE.SphereGeometry( 200, 32, 16 );
+					const sphereMaterial = new THREE.MeshBasicMaterial( { color: 0xffffff , transparent: true, opacity: 1} );
+					const sphere = new THREE.Mesh( sphereGeometry, sphereMaterial );
+					sphere.position.set((1020*i)+j,4000,0);
+					sphere.name = 'BUBBLE';
+					group.add(sphere);
+					//ülemise mulli number
+					const text = createText(i.toString(10));
+					sphere.add(text);
+					//sisseehitatud posti mull
+					const sphere1Material = new THREE.MeshBasicMaterial( { color: 0x7CFC00 , transparent: true, opacity: 1} );
+					const sphere1 = new THREE.Mesh( sphereGeometry, sphere1Material );
+					sphere1.position.x = (1020*i)+j;
+					sphere1.position.y = 2500;
+					sphere1.name = 'POST_BUBBLE' + i;
+					group.add(sphere1);
+
+					//konsooli mull
+					const sphere2 = new THREE.Mesh( sphereGeometry, sphereMaterial );
+					sphere2.position.set((1020*i)+j, 0, 2500);
+					sphere2.name = 'BUBBLE';
+					group.add(sphere2);
+
+					//gap mull
+					const sphere3Material = new THREE.MeshBasicMaterial( { color: 0xffbf00 , transparent: true, opacity: 1} );
+					const sphere3 = new THREE.Mesh( sphereGeometry, sphere3Material );
+					sphere3.position.x = (1020*i)+510+j;
+					sphere3.position.y = 2100;
+					sphere3.name = 'GAP_BUBBLE' + i 
+					group.add(sphere3);
+
+					//uksed
+					var doorsGroup = new THREE.Group();
+					//front uksed
+					var curDoor;
+						curDoor = doors[0].clone();
+						curDoor.position.x = (1020*i)+j;
+						doorsGroup.add(curDoor);
+						
+					//tagumised uksed
+						curDoor = doors[0].clone();
+						curDoor.position.x = (1020*i)+j;
+						curDoor.rotateY(3.14);
+						curDoor.visible = false;
+						doorsGroup.add(curDoor);
+					group.add(doorsGroup);
+
+					//lisatakse listi
+					moduleSets[i] = group;
+					moduleSets[i].name = 'moduleSets' + i;
+					scene.add(moduleSets[i] );
+					//mullid mida saab selectida
+					scene.selectableModule.push(sphere);
+					scene.selectableModule1.push(sphere1);
+					scene.selectableModule2.push(sphere2);
+					scene.selectableModule3.push(sphere3);
+					
+
+					// esialgu näidatakse ainult 5 moodulit
+					if(i > 5 ){ moduleSets[i].visible = false};
+				};
+			};
+
+			
+			function createText(text){
+				const fontSize = 100;
+				const canvas = document.createElement("canvas");
+				const ctx = canvas.getContext("2d");
+				ctx.font = `${fontSize}px Calibri`;
+				ctx.fillStyle = "#000000";
+				ctx.textAlign = "center";
+				ctx.textBaseline = "middle";
+				ctx.fillText(text, canvas.width / 2, fontSize);
+				
+				const texture = new THREE.Texture(canvas);
+				texture.needsUpdate = true;
+				const spriteMaterial = new THREE.SpriteMaterial({ map: texture, depthWrite: false });
+				spriteMaterial.depthTest = false;
+				const sprite = new THREE.Sprite(spriteMaterial);
+				sprite.name = 'Sprite' + text;
+				sprite.scale.set(750, 380, 0);
+				return sprite;
+			};
+			
 
 			function resize() {
 				camera.aspect = window.innerWidth / window.innerHeight;
 				camera.updateProjectionMatrix();
 				renderer.setSize( window.innerWidth, window.innerHeight );
-			}
+			};
 			
 
 			function animate() {		
 				requestAnimationFrame( animate );
 				controls.update();
-
 				render();
-			}
+			};
 
 
 			function onPointerMove( event ) {
 				event.preventDefault();
 				pointer.x = ( event.clientX / window.innerWidth ) * 2 - 1;
 				pointer.y = - ( event.clientY / window.innerHeight ) * 2 + 1;
-			}
+			};
 			
 
 			function render(){
 				raycaster.setFromCamera( pointer, camera );
-				var intersects = raycaster.intersectObjects( scene.selectableModule, true );
-				var intersects2 = raycaster.intersectObjects( scene.children, true );
-				var doorNames = ["XXXL","XXL", "XL", "L", "M", "S"]
-				var intersectedDoor
+
+				var intersects = raycaster.intersectObjects( scene.selectableModule, false );
+				var intersects1 = raycaster.intersectObjects( scene.selectableModule1, true );
+				var intersects2 = raycaster.intersectObjects( scene.children, true , intersects2 = []);
+				var intersects3 = raycaster.intersectObjects( scene.selectableModule2, true );
+				var intersects4 = raycaster.intersectObjects( scene.selectableModule3, true );
+
+				if (intersects.length > 0 && intersects[ 0 ].object.visible != true){ intersects = [] } ;
+				if (intersects1.length > 0 && intersects1[ 0 ].object.visible != true){ intersects1 = [] };
+				if (intersects2.length > 0 && intersects2[ 0 ].object.visible != true){ intersects2 = [] };
+				if (intersects3.length > 0 && intersects3[ 0 ].object.visible != true){ intersects3 = [] };
+				if (intersects4.length > 0 && intersects4[ 0 ].object.visible != true){ intersects4 = [] };
 
 				if ( intersects.length > 0 ) {
 					if ( INTERSECTED != intersects[ 0 ].object ) {
 						if ( INTERSECTED ) INTERSECTED.scale.set( 1,1,1 );
 						INTERSECTED = intersects[ 0 ].object;
-						INTERSECTED.scale.set( 1.2, 1, 1);
+						INTERSECTED.scale.set( 1.5, 1.5, 1.5);
 					}
 				} else {
 					if ( INTERSECTED ) INTERSECTED.scale.set( 1,1,1 );
-					INTERSECTED = null
+					INTERSECTED = null;
 				}
 
+				if ( intersects1.length > 0 ) {
+					if ( INTERSECTED1 != intersects1[ 0 ].object ) {
+						if ( INTERSECTED1 ) INTERSECTED1.scale.set( 1,1,1 );
+						INTERSECTED1 = intersects1[ 0 ].object;
+						INTERSECTED1.scale.set( 1.5, 1.5, 1.5);
+					}
+				} else {
+					if ( INTERSECTED1 ) INTERSECTED1.scale.set( 1,1,1 );
+					INTERSECTED1 = null;
+				}
 				
 				if ( intersects2.length > 0 ) {
 					if ( INTERSECTED2 != intersects2[ 0 ].object ) {
@@ -228,62 +626,413 @@
 							if (INTERSECTED2) INTERSECTED2.children[0].material.color.set(INTERSECTED2.cornerColor)
 								INTERSECTED2 = intersects2[ 0 ].object;
 								INTERSECTED2.cornerColor = INTERSECTED2.children[0].material.color.getHex();
-								INTERSECTED2.material = INTERSECTED2.material.clone();
 								const colores = INTERSECTED2.children[0].material.clone();
 								colores.color.set( 0xff0000 );
 								INTERSECTED2.children[0].material = colores;
-								doorSelected = true
-								}
+								};
 					} else {
-						if (INTERSECTED2) INTERSECTED2.children[0].material.color.set(INTERSECTED2.cornerColor)
-							doorSelected = false
-							INTERSECTED2 = null
-					}	
-				}
+						if (INTERSECTED2) INTERSECTED2.children[0].material.color.set(INTERSECTED2.cornerColor);
+						INTERSECTED2 = null;
+					};
+				} else {
+					if (INTERSECTED2) INTERSECTED2.children[0].material.color.set(INTERSECTED2.cornerColor);
+					INTERSECTED2 = null;
+				};
+
+				if ( intersects3.length > 0 ) {
+					if ( INTERSECTED3 != intersects3[ 0 ].object ) {
+						if ( INTERSECTED3 ) INTERSECTED3.scale.set( 1,1,1 );
+						INTERSECTED3 = intersects3[ 0 ].object;
+						INTERSECTED3.scale.set( 1.5, 1.5, 1.5);
+					};
+				} else {
+					if ( INTERSECTED3 ) INTERSECTED3.scale.set( 1,1,1 );
+					INTERSECTED3 = null;
+				};
+
+				if ( intersects4.length > 0 ) {
+					if ( INTERSECTED4 != intersects4[ 0 ].object ) {
+						if ( INTERSECTED4 ) INTERSECTED4.scale.set( 1,1,1 );
+						INTERSECTED4 = intersects4[ 0 ].object;
+						INTERSECTED4.scale.set( 1.5, 1.5, 1.5);
+					};
+				} else {
+					if ( INTERSECTED4 ) INTERSECTED4.scale.set( 1,1,1 );
+					INTERSECTED4 = null;
+				};
 				renderer.render( scene, camera );
 			}
 
+			function moduleSwitch(parentName){
+				//see funksioon teeb kiindalaks millist moodulit vahetada ja kas naabreid muuta
+				doorLayoutChange(parentName.children[5], 4);
+				let curModIndex = parseInt(parentName.name.split('moduleSets')[1]);
+				let leftModIndex = curModIndex - 1;
+				let rightModIndex = curModIndex + 1;
 
-			
+				if (parentName.children[0].name == 'base0'){
+					moduleSwitchSub(parentName, 1);
+					if (moduleTest(parentName, curModIndex, leftModIndex , 6, 7, 'base0')){};
+					if (moduleTest(parentName, curModIndex, rightModIndex , 7, 6,'base0')){};
+				} else if (parentName.children[0].name == 'base2'){
+					moduleSwitchSub(parentName, 3);
+					if (moduleTest(parentName, curModIndex, leftModIndex , 4, 5, 'base2')){};
+					if (moduleTest(parentName, curModIndex, rightModIndex , 5, 4, 'base2')){};
+				} else if (parentName.children[0].name == 'base1'){
+					moduleSwitchSub(parentName, 0);
+				} else if (parentName.children[0].name == 'base3'){
+					moduleSwitchSub(parentName, 2);
+				} else if (parentName.children[0].name == 'base4'){
+					moduleTest(parentName, curModIndex, leftModIndex , 2, 3, 'base2');
+				} else if (parentName.children[0].name == 'base5'){
+					moduleTest(parentName, curModIndex, rightModIndex , 2, 3, 'base2');
+				} else if (parentName.children[0].name == 'base6'){
+					moduleTest(parentName, curModIndex, leftModIndex , 0, 1, 'base0');
+				} else if (parentName.children[0].name == 'base7'){
+					moduleTest(parentName, curModIndex, rightModIndex , 0, 1, 'base0');
+				};
+
+				posts = [];
+				scene.traverse(function(object) {
+					if ( object.name.substring(0, 10) == 'moduleSets' && (parseInt(object.children[0].name.split('base')[1]) != 0 && parseInt(object.children[0].name.split('base')[1]) != 2)) {
+						posts.push(object);
+					};
+				}); 
+				posts = [...new Set(posts)];
+				gapBubbles();
+
+			}
+
+			function moduleTest(parentName, curModIndex, neighbourModIndex, baseInx, neigbourInx, mainName){
+				let answer = null;
+				parentName.parent.traverse(function(object) {
+					if (object.name == ('moduleSets'+ neighbourModIndex) && object.visible == true && object.children[0].name != mainName) {
+						moduleSwitchSub(object, neigbourInx);
+						moduleSwitchSub(parentName, baseInx);
+						answer = parseInt(neighbourModIndex - curModIndex);
+					};
+				});
+				
+				if (answer != null){
+					parentName.parent.traverse(function(object) {
+						if (object.name == ('moduleSets'+ parseInt(curModIndex + (answer*2))) && object.children[0].name != mainName) {
+							moduleSwitchSub(object, parseInt(mainName.split('base')[1]));
+						};
+					});
+				}
+				return answer;
+			};
+
+			function  moduleSwitchSub(parentName, nxtIndex){
+				//see funksioon vahetab mooduli ära
+				const v = new THREE.Vector3(0,0,0);
+				const v3 = new THREE.Vector3(0,0,0);
+				var supModel = modelsGroup[nxtIndex].clone();
+				var vpos = parentName.children[0].getWorldPosition(v);
+				var vpos3 = parentName.getWorldPosition(v3);
+				supModel.position.set(vpos.x-vpos3.x, vpos.y, vpos.z);
+				supModel.visible = true;
+				parentName.remove(parentName.children[0]);
+				parentName.add(supModel) //peab kasutama add sest unshiftiga ta ei käitu enam õigesti ja selelpärast peab ka käsitsi ümber tõstma
+				var temp0 = parentName.children[0];
+				var temp1 = parentName.children[1];
+				var temp2 = parentName.children[2];
+				var temp3 = parentName.children[3];
+				var temp4 = parentName.children[4];
+				var temp5 = parentName.children[5];
+				parentName.children[0] = temp5;
+				parentName.children[1] = temp0;
+				parentName.children[2] = temp1;
+				parentName.children[3] = temp2;
+				parentName.children[4] = temp3;
+				parentName.children[5] = temp4;
+			};
 
 			document.onpointerdown = function(event) {
 				switch ( event.button ) {
-					case 0: 				
-						if (INTERSECTED != null){
-							var myIndex = doors.findIndex(x => x.name === INTERSECTED.parent.children[1].name) 
-							const v = new THREE.Vector3(0,0,0);
-							const v3 = new THREE.Vector3(0,0,0);
-							var supDoor = doors[cycleArray(myIndex, doors, 10)].clone();
-							var vpos = INTERSECTED.parent.children[1].getWorldPosition(v)
-							var vpos3 = INTERSECTED.parent.getWorldPosition(v3)
-							supDoor.position.set(vpos.x-vpos3.x, vpos.y, vpos.z);
-							INTERSECTED.parent.remove(INTERSECTED.parent.children[1]);
-							INTERSECTED.parent.add(supDoor) ;
-							countDoors();
-						}
+					case 0:
+						//muudab usete layouti
+						if (INTERSECTED != null && allowedModules.includes(INTERSECTED.parent.children[0].name)){
+							doorLayoutChange(INTERSECTED.parent.children[5], doors.findIndex(x => x.name === INTERSECTED.parent.children[5].children[0].name));
+						} else if (INTERSECTED1 != null) {
+						// muudab moodulit
+							moduleSwitch(INTERSECTED1.parent);
+						} else if ((INTERSECTED3 != null && INTERSECTED3.parent.children[5].children[0].name !='XXXL_Group')){
+						//muudab konsooli asukohta
+							changeConsole(INTERSECTED3.parent)
+						} else if (INTERSECTED4 != null ){
+						//tekitab kapivahe
+							createGap(INTERSECTED4.parent);
+						};
 						break;
-					case 1: //console.log("Middle Button is down."); 
+					case 1: //("Middle Button is down.");
 						break;
-					case 2: //console.log("Right Button is down.");
-						if ( doorSelected == true){
-							if (INTERSECTED2.name != "S" && INTERSECTED2.name != "M" )
-								var myColorIndex = doorColors.findIndex(x => x === INTERSECTED2.material.color.getHex())
+					case 2: //("Right Button is down.");
+						if ( INTERSECTED2){
+							INTERSECTED2.material = INTERSECTED2.material.clone();
+							if (INTERSECTED2.name != "S" && INTERSECTED2.name != "M" ){
+								var myColorIndex = doorColors.findIndex(x => x === INTERSECTED2.material.color.getHex());
 								if (INTERSECTED2.name != "XXXL"){
-									INTERSECTED2.material.color.set( doorColors[cycleArray(myColorIndex, doorColors, 5)] )
-								} else{
-									INTERSECTED2.material.color.set( doorColors[cycleArray(myColorIndex, doorColors, 2)] )
-								}
+									INTERSECTED2.material.color.set( doorColors[cycleArray(myColorIndex, doorColors, 5)] );
+								} else {
+									INTERSECTED2.material.color.set( doorColors[cycleArray(myColorIndex, doorColors, 2)] );
+								};
+							};
 							countDoors();
-						}
+						};
 						break;
-				}
-			}
+				};
+			};
 
+			function doorLayoutChange(parentName, myIndex){
+				var conslActive = false;
+				parentName.traverse(function(object) {
+					if (object.name == 'CONSOLE' && object.visible == true) {
+						conslActive = true;
+					};
+				});
+				//var myIndex = doors.findIndex(x => x.name === parentName.children[0].name) 
+				const v = new THREE.Vector3(0,0,0);
+				const v1 = new THREE.Vector3(0,0,0);
+				const v3 = new THREE.Vector3(0,0,0);
+				var supDoor = doors[cycleArray(myIndex, doors, 10)].clone();
+				var supDoor1 = supDoor.clone();
+				var vpos = parentName.children[0].getWorldPosition(v);
+				var vpos1 = parentName.children[1].getWorldPosition(v1);
+				var vpos3 = parentName.parent.getWorldPosition(v3);
+				supDoor.position.set(vpos.x-vpos3.x, vpos.y, vpos.z);
+				supDoor1.position.set(vpos1.x-vpos3.x, vpos1.y, vpos1.z);
+				supDoor1.rotateY(3.14);
+				if (singleState == true){
+					supDoor1.visible = false;
+				} else {
+					supDoor1.visible = true;
+				};
+				parentName.remove(parentName.children[0]);
+				parentName.remove(parentName.children[0]);
+				parentName.add(supDoor) ;
+				parentName.add(supDoor1) ;
+				if (conslActive == true){
+					changeConsole(parentName);
+				};
+				countDoors();
+			};
+			
+			function createGap(intersectedParent){
+				let curModIndex = parseInt(intersectedParent.name.split('moduleSets')[1]);
+				let currObject = scene.getObjectByName('moduleSets' + curModIndex);
+				var x = 0;
+				if (gaps.includes(currObject)){
+					const index = gaps.indexOf(currObject);
+					gaps.splice(index, 1);
+					x = -1020;
+					currObject.children[4].position.x -= 1020/2;
+					currObject.children[4].position.y += 1800;
+				} else {
+					gaps.push(currObject);
+					x = 1020;
+					currObject.children[4].position.x += 1020/2;
+					currObject.children[4].position.y -= 1800;
+				};
+
+				for (let i = 0 + 1; i < 31; i++){
+					var object = scene.getObjectByName('moduleSets' + i);
+					object.position.x -=  (x/2);
+				};
+
+				for (let i = curModIndex + 1; i < 31; i++){
+					var object = scene.getObjectByName('moduleSets' + i);
+					object.position.x += x;
+				};
+
+				var lockerLength = parseInt(lengthInput.value) + gaps.length;
+				remove("plane1");
+				createPlane((lockerLength*1020)+2000);
+				gapBubbles();
+			};
+
+			function restorePosts(){
+				var lockerLength =  parseInt(lengthInput.value);
+				var sample = scene.getObjectByName('moduleSets1').children[0].name;
+				for (let i = 1; i < lockerLength; i++){
+					var object = scene.getObjectByName('moduleSets' + i);
+					var preObject = scene.getObjectByName('moduleSets' + (i-1));
+
+					if (object.visible == true && i + 4 > lockerLength){
+						const index = posts.indexOf(object);
+						if (index != -1){posts.splice(index, 1)};
+						
+						if (sample == 'base0'){
+							if (preObject.children[0].name != sample && object.children[0].name != sample){
+								moduleSwitchSub(preObject, 1);
+								moduleSwitchSub(object, 0);
+							} else {
+								moduleSwitchSub(object, 0);
+							};
+						} else if (sample == 'base2'){
+							if (preObject.children[0].name != sample && object.children[0].name != sample){
+								moduleSwitchSub(preObject, 3);
+								moduleSwitchSub(object, 2);
+							} else {
+								moduleSwitchSub(object, 2);
+							};
+						};
+					};
+				};
+			};
+
+			function removeGaps(){
+				var x = 1020;
+				for (let i = 1; i < 31; i++){
+					var object = scene.getObjectByName('moduleSets' + i);
+					object.position.x -=  (x/2);
+				};
+			};
+
+			function restoreGaps(mul){
+				if (mul == -1){
+					for (let i = 0; i < gaps.length; i++){
+						gaps[i].children[4].position.x -= 1020/2;
+						gaps[i].children[4].position.y += 1800;
+					};
+					gaps = [];
+					for (let i = 1; i < 31; i++){
+						var lockerLength = parseInt(lengthInput.value);
+						var k = -((lockerLength*1020)/2)+2040+(1020/2);
+						var object = scene.getObjectByName('moduleSets' + i);
+						object.position.x = k;
+					};
+				} else {
+					for (let i = 1; i < 31; i++){
+						var object = scene.getObjectByName('moduleSets' + i);
+						object.position.x -= (1020/2)*gaps.length;
+					};
+					for (let i = 0; i < gaps.length; i++){
+						let curModIndex = parseInt(gaps[i].name.split('moduleSets')[1]);
+						if (curModIndex + 4 > parseInt(lengthInput.value) ){
+							gaps[i].children[4].position.x -= 1020/2;
+							gaps[i].children[4].position.y += 1800;
+							gaps.splice(i, 1);
+							for (let j = curModIndex + 1; j < 31; j++){
+								var object2 = scene.getObjectByName('moduleSets' + j);
+									object2.position.x -= 1020;
+							};
+							for (let k = 1; k < 31; k++){
+								var object = scene.getObjectByName('moduleSets' + k);
+								object.position.x += (1020/2);
+							};
+						};
+						for (let j = curModIndex + 1; j < 31; j++){
+							var object2 = scene.getObjectByName('moduleSets' + j);
+								object2.position.x += 1020;
+						};
+					};
+				};
+				var lockerLength = parseInt(lengthInput.value) + gaps.length;
+				remove("plane1");
+				createPlane((lockerLength*1020)+2000);
+				gapBubbles();
+			};
+
+			function changeConsole(parentDoor){
+				//eemalda consool mujalt
+				scene.traverse(function(object){
+					if (object.name == 'CONSOLE' && object.visible == true) {
+						object.visible = false;
+						object.parent.children[0].material = object.parent.children[0].material.clone();
+						object.parent.children[0].material.color.set(0xe1e0de);
+						};
+				});
+				//lisa uus consool
+				parentDoor.traverse(function(object) {
+						if (object.name == 'CONSOLE') {
+						object.visible = true;
+						object.parent.children[0].material = object.parent.children[0].material.clone();
+						object.parent.children[0].material.color.set(0xf4db14);
+						};
+				});
+				countDoors ();
+			};
 
 			function cycleArray(count, name, max) {
 				count++;
-				if (count === name.length || count ===max ) {count = 0;}
-				return count
+				if (count === name.length || count ===max ) {count = 0;};
+				return count;
+			};
+
+
+			function gapBubbles(){
+				let exPosts = [];
+				let exGaps = [];
+				var lockerLength =  parseInt(lengthInput.value);
+
+				populateLists(posts, exPosts, [-4, -3, -2, 2, 3, 4]);
+				populateLists(gaps, exPosts, [-3, -2, -1, 0, 1, 2, 3, 4]);
+				populateLists(gaps, exGaps, [-3, -2, -1, 1, 2, 3]);
+				populateLists(posts, exGaps, [-4, -3, -2, -1, 0, 1, 2, 3]);
+
+				function populateLists(inpList, outList, excludedList){
+					for (let i = 0; i < inpList.length; i++){
+						let currModueNo = parseInt(inpList[i].name.split('moduleSets')[1]);
+						for (let j = 0; j < excludedList.length; j++){
+							outList.push(currModueNo + excludedList[j]);
+						};
+					};
+				};
+
+				showHideBubbles('POST_BUBBLE', exPosts, 5);
+				showHideBubbles('GAP_BUBBLE', exGaps, 4);
+
+				function showHideBubbles(gapName, gapList, max){
+					for (let i = 1; i < 31; i++){
+						var bubbleObject = scene.getObjectByName(gapName + i);
+						if (i < max || i > lockerLength - 4 || gapList.includes(i)) {
+							bubbleObject.visible = false;
+						} else {
+							bubbleObject.visible = true;
+						};
+					};
+				};
+
+				postsCount.innerHTML = posts.length;
+				gapsCount.innerHTML = gaps.length;
+				doublePostsCount.innerHTML = cntConsecutiveElements();
+			}
+
+
+			function cntConsecutiveElements() {
+				let result = 0;
+				let curr = 0;
+				let prev = 0;
+				let count = 0;
+				if(posts.length > 1){
+					for (let i = 1; i < posts.length; i++){
+						curr = parseInt(posts[i].name.split('moduleSets')[1]);
+						prev = parseInt(posts[i-1].name.split('moduleSets')[1]);
+						if (curr - 1 == prev){
+							count += 1;
+						};
+					};
+					return count;
+				} else {
+					return 0;
+				};
+			};
+
+			function createRoof(){
+				var roofGoeometry = new THREE.BoxGeometry( (parseInt(lengthInput.value)*1020)+500, 4600, 170 );
+				var roofMaterial = new THREE.MeshBasicMaterial({ color: 0xe1e0de });
+				var roofMesh = new THREE.Mesh(roofGoeometry, roofMaterial);
+
+				const edges = new THREE.EdgesGeometry( roofGoeometry );
+				const line = new THREE.LineSegments( edges, new THREE.LineBasicMaterial( { color: 0x000000 } ) );
+				roofMesh.add( line );
+
+				roofMesh.position.set(0,2793,0);
+				roofMesh.rotation.set(-1.627,0,0);
+				roofMesh.name = 'ROOF_TOP';
+
+				scene.add(roofMesh);
 			}
 
 			function createDoors() {
@@ -292,119 +1041,115 @@
 									[1005, 890, 44, 0xe1e0de, 1657, "XL"],
 									[497, 890, 44, 0xe1e0de, 1657, "L"],
 									[326, 890, 44, 0xe1e0de, 1657, "M"],
-									[497, 441, 44, 0xe1e0de, 1433, "S"]
-				]
+									[497, 441, 44, 0xe1e0de, 1433, "S"],
+									[1000, 300, 2, 0xcaccce, 200, "KP"],
+									[400, 330, 2, 0x000000, 988, "CONSOLE"]
+				];
 				for (let i=0; i < doorData.length; i++){
 				//uksed
 
 					var doorModuleGoeometry = new THREE.BoxGeometry( doorData[i][0], doorData[i][1], doorData[i][2] );
-					var doorModuleMmaterial = new THREE.MeshPhongMaterial({ color: doorData[i][3] })
-					var doorMesh = new THREE.Mesh(doorModuleGoeometry, doorModuleMmaterial)
+					var doorModuleMmaterial = new THREE.MeshBasicMaterial({ color: doorData[i][3] });
+					var doorMesh = new THREE.Mesh(doorModuleGoeometry, doorModuleMmaterial);
 
 					doorMesh.position.x = 0;
 					doorMesh.position.y = doorData[i][4];
-					doorMesh.position.z = 1522;
+					if (doorData[i][5] == 'KP'|| doorData[i][5] =='CONSOLE'){
+						doorMesh.position.z = 1545;
+					} else {
+						doorMesh.position.z = 1522;
+					}		
 					doorMesh.name = doorData[i][5];
-
 					const edges = new THREE.EdgesGeometry( doorModuleGoeometry );
 					const line = new THREE.LineSegments( edges, new THREE.LineBasicMaterial( { color: 0x000000 } ) );
 					doorMesh.add( line );
-					
-					doorSamples[i] = doorMesh
-
-				}
-				var kickPlateGeometry = new THREE.BoxGeometry( 1000, 300, 2 );
-				var kickPlateMmaterial = new THREE.MeshPhongMaterial({ color: 0xcaccce })
-				var kickPlate = new THREE.Mesh(kickPlateGeometry, kickPlateMmaterial)
+					doorSamples[i] = doorMesh;
+				};
 
 				//XXXL uks
 				var drGroup = new THREE.Group();
-				var xxxlDoor = doorSamples[0].clone()
-				drGroup.add(xxxlDoor)
-				var kp = kickPlate.clone();
-				kp.position.x = 0;
-				kp.position.y = 200;
-				kp.position.z = 1546;
+				var xxxlDoor = doorSamples[0].clone();
+				drGroup.add(xxxlDoor);
+				var kp = doorSamples[6].clone();
 				drGroup.add(kp);
-				drGroup.name = "XXXL_Group"
+				drGroup.name = "XXXL_Group";
 				doors[0] = drGroup;
 				//XL uks
 				var drGroup = new THREE.Group();
-				var xxlDoor = doorSamples[1].clone()
-				drGroup.add(xxlDoor)
-				var kp = kickPlate.clone()
-				kp.position.x = 0;
-				kp.position.y = 200;
-				kp.position.z = 1546;
-				drGroup.name = "XL_Group"
-				var xlDoor = doorSamples[2].clone()
-				drGroup.add(xlDoor)
-				drGroup.add(kp)
-				doors[1] = drGroup
+				var xxlDoor = doorSamples[1].clone();
+				drGroup.add(xxlDoor);
+				var kp = doorSamples[6].clone();
+				drGroup.name = "XL_Group";
+				var xlDoor = doorSamples[2].clone();
+				drGroup.add(xlDoor);
+				drGroup.add(kp);
+				var cons = doorSamples[7].clone();
+				cons.visible = false;
+				drGroup.add(cons);
+				doors[1] = drGroup;
 				//L uks
 				var drGroup = new THREE.Group();
-				var xxlDoor = doorSamples[1].clone()
-				drGroup.add(xxlDoor)
-				var kp = kickPlate.clone()
-				kp.position.x = 0;
-				kp.position.y = 200;
-				kp.position.z = 1546;
-				var lDoor = doorSamples[3].clone()
+				var xxlDoor = doorSamples[1].clone();
+				drGroup.add(xxlDoor);
+				var kp = doorSamples[6].clone();
+				var lDoor = doorSamples[3].clone();
 				lDoor.position.x = -245;
-				var lDoor2 = doorSamples[3].clone()
+				var lDoor2 = doorSamples[3].clone();
 				lDoor2.position.x = +245;
-				drGroup.add(lDoor)
-				drGroup.add(lDoor2)
-				drGroup.add(kp)
-				drGroup.name = "L_Group"
-				doors[2] = drGroup
+				drGroup.add(lDoor);
+				drGroup.add(lDoor2);
+				drGroup.add(kp);
+				var cons = doorSamples[7].clone();
+				cons.visible = false;
+				drGroup.add(cons);
+				drGroup.name = "L_Group";
+				doors[2] = drGroup;
 				//M uks
 				var drGroup = new THREE.Group();
-				var xxlDoor = doorSamples[1].clone()
-				drGroup.add(xxlDoor)
-				var kp = kickPlate.clone()
-				kp.position.x = 0;
-				kp.position.y = 200;
-				kp.position.z = 1546;
-				var mDoor = doorSamples[4].clone()
+				var xxlDoor = doorSamples[1].clone();
+				drGroup.add(xxlDoor);
+				var kp = doorSamples[6].clone();
+				var mDoor = doorSamples[4].clone();
 				mDoor.position.x = -339;
-				var mDoor2 = doorSamples[4].clone()
+				var mDoor2 = doorSamples[4].clone();
 				mDoor2.position.x = +339;
-				var mDoor3 = doorSamples[4].clone()
+				var mDoor3 = doorSamples[4].clone();
 				mDoor3.position.x = 0;
-				drGroup.add(mDoor)
-				drGroup.add(mDoor2)
-				drGroup.add(mDoor3)
-				drGroup.add(kp)
-				drGroup.name = "M_Group"
-				doors[3] = drGroup
+				drGroup.add(mDoor);
+				drGroup.add(mDoor2);
+				drGroup.add(mDoor3);
+				drGroup.add(kp);
+				var cons = doorSamples[7].clone();
+				cons.visible = false;
+				drGroup.add(cons);
+				drGroup.name = "M_Group";
+				doors[3] = drGroup;
 				//S uks
 				var drGroup = new THREE.Group();
-				var xxlDoor = doorSamples[1].clone()
-				drGroup.add(xxlDoor)
-				var kp = kickPlate.clone()
-				kp.position.x = 0;
-				kp.position.y = 200;
-				kp.position.z = 1546;
-				var sDoor = doorSamples[5].clone()
+				var xxlDoor = doorSamples[1].clone();
+				drGroup.add(xxlDoor);
+				var kp = doorSamples[6].clone();
+				var sDoor = doorSamples[5].clone();
 				sDoor.position.x = -254;
-				var sDoor2 = doorSamples[5].clone()
+				var sDoor2 = doorSamples[5].clone();
 				sDoor2.position.x = -254;
 				sDoor2.position.y = 1883;
-				var sDoor3 = doorSamples[5].clone()
+				var sDoor3 = doorSamples[5].clone();
 				sDoor3.position.x = 254;
 				sDoor3.position.y = 1883;
-				var sDoor4 = doorSamples[5].clone()
+				var sDoor4 = doorSamples[5].clone();
 				sDoor4.position.x = 254;
-				drGroup.add(sDoor)
-				drGroup.add(sDoor2)
-				drGroup.add(sDoor3)
-				drGroup.add(sDoor4)
-				drGroup.add(kp)
-				drGroup.name = "S_Group"
-				doors[4] = drGroup
-
-				}
+				drGroup.add(sDoor);
+				drGroup.add(sDoor2);
+				drGroup.add(sDoor3);
+				drGroup.add(sDoor4);
+				drGroup.add(kp);
+				var cons = doorSamples[7].clone();
+				cons.visible = false;
+				drGroup.add(cons);
+				drGroup.name = "S_Group";
+				doors[4] = drGroup;
+			};
 			
 
 			function countDoors (){
@@ -415,6 +1160,7 @@
 				var lDoorsCount = document.getElementById("lDoorsCount");
 				var mDoorsCount = document.getElementById("mDoorsCount");
 				var sDoorsCount = document.getElementById("sDoorsCount");
+				var consoleCount = document.getElementById("consoleCount");
 				//värvilised
 				var sDoorsCountw = document.getElementById("sDoorsCountw");
 				var mDoorsCountw = document.getElementById("mDoorsCountw");
@@ -431,12 +1177,13 @@
 				var xxxlDoorsCounty = document.getElementById("xxxlDoorsCounty");
 
 				var difDoorsCounts =[	["XXXL", xxxlDoorsCount],
-										["XXL", xxlDoorsCount],
 										["XL", xlDoorsCount],
 										["L", lDoorsCount],
 										["M", mDoorsCount],
-										["S", sDoorsCount]
-									]
+										["S", sDoorsCount],
+										["CONSOLE", consoleCount],
+										["XXL", xxlDoorsCount]
+									];
 				var difColorDoorsCounts =[	["L", lDoorsCountw, 0xe1e0de ],
 											["L", lDoorsCounty, 0xf4db14 ],
 											["L", lDoorsCountb, 0x005ea0 ],
@@ -448,106 +1195,175 @@
 											["XXL", xxlDoorsCountb, 0x005ea0 ],
 											["XXXL", xxxlDoorsCountw, 0xe1e0de ],
 											["XXXL", xxxlDoorsCounty, 0xf4db14 ]
-										]
+										];
 				
 				for (let i = 0; i < difDoorsCounts.length; i++){
-					var cnt = 0
+					var cnt = 0;
 					scene.traverse(function(mesh) {
 						if (mesh.name === difDoorsCounts[i][0]) {
-							if (mesh.parent.parent.visible == true){
-								cnt += 1
-						}}
+							if (mesh.parent.parent.parent.visible == true && mesh.parent.visible ==true && mesh.visible == true){
+								cnt += 1;
+						}};
 					});
-					difDoorsCounts[i][1].innerHTML = cnt
-				}
+					if (difDoorsCounts[i][0] == "XXL"){ cnt -= consoleCount.innerHTML };
+					difDoorsCounts[i][1].innerHTML = cnt;
+				};
 				for (let i = 0; i < difColorDoorsCounts.length; i++){
-						var cnt = 0
+						var cnt = 0;
 						scene.traverse(function(mesh) {
 							if (mesh.name === difColorDoorsCounts[i][0]) {
-								if (mesh.parent.parent.visible == true){
+								if (mesh.parent.parent.parent.visible == true && mesh.parent.visible ==true){
 									if (mesh.material.color.getHex() == difColorDoorsCounts[i][2]){
-									cnt += 1
-							}}}
+									cnt += 1;
+							}}};
 						});
-						difColorDoorsCounts[i][1].innerHTML = cnt
-				}
-				sDoorsCountw.innerHTML = sDoorsCount.innerHTML
-				mDoorsCountw.innerHTML = mDoorsCount.innerHTML
-			}
-
-
+						if (difColorDoorsCounts[i][0] == "XXL" && difColorDoorsCounts[i][2] == 0xf4db14){
+							cnt -= consoleCount.innerHTML;
+						};
+						difColorDoorsCounts[i][1].innerHTML = cnt;
+				};
+				sDoorsCountw.innerHTML = sDoorsCount.innerHTML;
+				mDoorsCountw.innerHTML = mDoorsCount.innerHTML;
+			};
+		
 		</script>
-		<div style="position: absolute; top: 20px; left: 20px; text-align: left;">
-		<h1 style="color:black;">PUL Length</h1>
-		<input type="range" min="4" max="30" value="5" class="slider" id="locker_length">
-		<p style="color:black;">Modules: <span id="locker_length_out"></span></p>
-		<button id="button1" class="camera-button">Front View</button>
-		<style>
-			th {
-			border: 1px solid black;
-			border-radius: 5px;
-			text-align: center;
-			width: 100px
-			}
-			td {
-			border: 1px solid black;
-			border-radius: 10px;
-			text-align: center;
-			width: 50px
-			}
-		</style>
-		<table>
-			<tr>
-				<th>Door Layout</th>
-				<td>SUM</td>
-				<td>White</td>
-				<td>Yellow</td>
-				<td>Blue</td>
-			</tr>
-			<tr>
-				<th>S-Door</th>
-				<td><span id="sDoorsCount">0</span></td>
-				<td><span id="sDoorsCountw">0</span></td>
-				<td>X</td>
-				<td>X</td>
-			</tr>
-			<tr>
-				<th>M-Door</th>
-				<td><span id="mDoorsCount">0</span></td>
-				<td><span id="mDoorsCountw">0</span></td>
-				<td>X</td>
-				<td>X</td>
-			</tr>
-			<tr>
-				<th>L-Door</th>
-				<td><span id="lDoorsCount">0</span></td>
-				<td><span id="lDoorsCountw">0</span></td>
-				<td><span id="lDoorsCounty">0</span></td>
-				<td><span id="lDoorsCountb">0</span></td>
-			</tr>
-			<tr>
-				<th>XL-Door</th>
-				<td><span id="xlDoorsCount">0</span></td>
-				<td><span id="xlDoorsCountw">0</span></td>
-				<td><span id="xlDoorsCounty">0</span></td>
-				<td><span id="xlDoorsCountb">0</span></td>
-			</tr>
-			<tr>
-				<th>XXL-Door</th>
-				<td><span id="xxlDoorsCount">0</span></td>
-				<td><span id="xxlDoorsCountw">0</span></td>
-				<td><span id="xxlDoorsCounty">0</span></td>
-				<td><span id="xxlDoorsCountb">0</span></td>
-			</tr>
-			<tr>
-				<th>XXXL-Door</th>
-				<td><span id="xxxlDoorsCount">5</span></td>
-				<td><span id="xxxlDoorsCountw">5</span></td>
-				<td><span id="xxxlDoorsCounty">0</span></td>
-				<td>X</td>
-			</tr>
-		  </table>
-		</div>
-	
+		
+		 
 
-</body></html>
+	<div class="wrapper side-panel-open">
+
+		<div class="side-panel">
+			<br>
+			<p>Locker Length</p>
+			<input type="range" min="4" max="30" value="5" class="slider" id="locker_length">
+			<p> Modules: <span id="locker_length_out"></span></p>
+			<button id="button0" class="button">Hide Bubbles</button>
+			<button id="button1" class="button">Front View</button>
+			<button id="button4" class="button">Back View</button>
+			<button id="button2" class="button">Indoor / Outdoor</button>
+			<button id="button3" class="button">Single / Double</button>
+			<br>
+	
+			<table>
+				<tr>
+					<th>Door Layout</th>
+					<td class="td_top">SUM</td>
+					<td class="td_top">White</td>
+					<td class="td_top">Yellow</td>
+					<td class="td_top">Blue</td>
+				</tr>
+				<tr>
+					<th>S-Door</th>
+					<td><span id="sDoorsCount">0</span></td>
+					<td><span id="sDoorsCountw">0</span></td>
+					<td>X</td>
+					<td>X</td>
+				</tr>
+				<tr>
+					<th>M-Door</th>
+					<td><span id="mDoorsCount">0</span></td>
+					<td><span id="mDoorsCountw">0</span></td>
+					<td>X</td>
+					<td>X</td>
+				</tr>
+				<tr>
+					<th>L-Door</th>
+					<td><span id="lDoorsCount">0</span></td>
+					<td><span id="lDoorsCountw">0</span></td>
+					<td><span id="lDoorsCounty">0</span></td>
+					<td><span id="lDoorsCountb">0</span></td>
+				</tr>
+				<tr>
+					<th>XL-Door</th>
+					<td><span id="xlDoorsCount">0</span></td>
+					<td><span id="xlDoorsCountw">0</span></td>
+					<td><span id="xlDoorsCounty">0</span></td>
+					<td><span id="xlDoorsCountb">0</span></td>
+				</tr>
+				<tr>
+					<th>XXL-Door</th>
+					<td><span id="xxlDoorsCount">0</span></td>
+					<td><span id="xxlDoorsCountw">0</span></td>
+					<td><span id="xxlDoorsCounty">0</span></td>
+					<td><span id="xxlDoorsCountb">0</span></td>
+				</tr>
+				<tr>
+					<th>XXXL-Door</th>
+					<td><span id="xxxlDoorsCount">5</span></td>
+					<td><span id="xxxlDoorsCountw">5</span></td>
+					<td><span id="xxxlDoorsCounty">0</span></td>
+					<td>X</td>
+				</tr>
+			</table>
+			<br>
+			<table>
+				<tr>
+					<td class="front_td">Console Doors</td>
+					<td><span id="consoleCount">0</span></td>
+				</tr>
+				<tr>
+					<td class="front_td">Posts inside locker</td>
+					<td><span id="postsCount">0</span></td>
+				</tr>
+				<tr>
+					<td class="front_td">Double posts count</td>
+					<td><span id="doublePostsCount">0</span></td>
+				</tr>
+				<tr>
+					<td class="front_td">Gaps</td>
+					<td><span id="gapsCount">0</span></td>
+				</tr>
+			</table>
+			<button id="exportScene" class="button">export</button><input type="text" id="exportSceneName" name="name" requiredminlength="0" maxlength="13" size="10" value="default_name">
+			<label class="button">import<input id="importTXT" type="file" style="display: none;"></label>reload page before
+		</div>
+
+
+		<button class="side-panel-toggle" type="button">
+			<span class="material-icons sp-icon-open">keyboard_double_arrow_right</span>
+			<span class="material-icons sp-icon-close">keyboard_double_arrow_left</span>
+		</button>
+
+
+		<div class="main">
+			<div id ="canvas"></div>
+			<div id="legend">
+				<ul>
+					<dt><span class="dot" style="background-color:#ffffff"> &nbsp8</span></dt>
+					<dd>- change door layout</dd>
+					<br>
+					<dt><span class="dot" style="background-color:#ffbf00"></span></dt>
+					<dd>- create/remove gap</dd>
+					<br>
+					<dt><span class="dot" style="background-color:#7CFC00" ></span></dt>
+					<dd>- create/remove blank</dd>
+					<br>
+					<dt><span class="dot" style="background-color:#ffffff" ></span></dt>
+					<dd>- position console</dd>
+				</ul>
+			</div>
+	
+			
+			
+		</div>
+
+
+	</div>
+
+
+	<script>
+		document.querySelector(".side-panel-toggle").addEventListener("click", () => {
+			document.querySelector(".wrapper").classList.toggle("side-panel-open");
+			let element = document.getElementById("legend");
+    		let hidden = element.getAttribute("hidden");
+			if (hidden) {
+				element.removeAttribute("hidden");
+			} else {
+				element.setAttribute("hidden", "hidden");
+			}
+		});
+	</script>
+
+
+</body>
+</html>
