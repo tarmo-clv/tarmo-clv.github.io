@@ -431,19 +431,22 @@
 				// kõikvõimalikud baasmudelid laetakse korraga
 				var  loader = new STLLoader();
 				let modelsList =["https://tarmo-clv.github.io/js/IDSS.STL", "https://tarmo-clv.github.io/js/IDSS_B1.STL", "https://tarmo-clv.github.io/js/IDDS.STL", "https://tarmo-clv.github.io/js/IDDS_B1.STL", "https://tarmo-clv.github.io/js/IDDS_B2.STL", "https://tarmo-clv.github.io/js/IDDS_B3.STL", "https://tarmo-clv.github.io/js/IDSS_B2.STL", "https://tarmo-clv.github.io/js/IDSS_B3.STL", "https://tarmo-clv.github.io/js/ODSS.STL", "https://tarmo-clv.github.io/js/ODDS.STL" ]
-
-				loader.load( "https://tarmo-clv.github.io/js/ROOF.STL", function (geometry) {
-					var material = new THREE.MeshBasicMaterial({ color: 0xe1e0de, transparent: true, opacity: 1 });
-					var roof = new THREE.Mesh(geometry, material);
-					roof.rotation.set( - Math.PI / 2,  Math.PI / 1, - Math.PI / 1 );
-					roof.position.set(110,1020,0);
-					const edges = new THREE.EdgesGeometry( geometry );
-					const line = new THREE.LineSegments( edges, new THREE.LineBasicMaterial( { color: 0x000000 } ) );
-					roof.add( line );
-					roof.name = "ROOF";
-					roof.visible = false;
-					ROOF = roof;
-					});
+				
+				await new Promise(resolve => {
+					loader.load( "https://tarmo-clv.github.io/js/ROOF.STL", function (geometry) {
+						var material = new THREE.MeshBasicMaterial({ color: 0xe1e0de, transparent: true, opacity: 1 });
+						var roof = new THREE.Mesh(geometry, material);
+						roof.rotation.set( - Math.PI / 2,  Math.PI / 1, - Math.PI / 1 );
+						roof.position.set(110,1020,0);
+						const edges = new THREE.EdgesGeometry( geometry );
+						const line = new THREE.LineSegments( edges, new THREE.LineBasicMaterial( { color: 0x000000 } ) );
+						roof.add( line );
+						roof.name = "ROOF";
+						roof.visible = false;
+						ROOF = roof;
+						resolve();
+						});
+				});
 
 				for (let i=0; i < modelsList.length; i++){
 					await new Promise(resolve => {
